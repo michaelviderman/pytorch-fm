@@ -7,7 +7,7 @@
 
 # queue gpu_v100   or   default
 export QUEUE=gpu_v100
-export USER=viderman
+export USER=<username>
 export BASE_PATH=hdfs://jetblue-nn1.blue.ygrid.yahoo.com:8020/projects/moneyball/${USER}/low_rank_experiments
 export SRC_PATH=${BASE_PATH}/src
 # ------------------------------------- #

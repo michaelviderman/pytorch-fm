@@ -6,7 +6,7 @@ import torch
 import sys
 
 from src.torchfm.torch_utils.batch_iterator import BatchIter
-from src.torchfm.torch_utils.constants import debug_print, torch_global_seed, python_random_seed, movielens, criteo, avazu
+from src.torchfm.torch_utils.constants import *
 from src.torchfm.dataset.wrapper_dataset import WrapperDataset
 from src.torchfm.dataset.wrapper_multivalued_dataset import WrapperMultivaluedDataset
 from src.torchfm.model.afi import AutomaticFeatureInteractionModel
@@ -18,6 +18,7 @@ from src.torchfm.model.fm import FactorizationMachineModel
 from src.torchfm.model.fnfm import FieldAwareNeuralFactorizationMachineModel
 from src.torchfm.model.fnn import FactorizationSupportedNeuralNetworkModel
 from src.torchfm.model.hofm import HighOrderFactorizationMachineModel
+from src.torchfm.model.tensorfm import TensorFactorizationMachineModel
 from src.torchfm.model.lr import LogisticRegressionModel
 from src.torchfm.model.ncf import NeuralCollaborativeFiltering
 from src.torchfm.model.nfm import NeuralFactorizationMachineModel
@@ -84,12 +85,10 @@ def get_criterion(criterion):
 def get_dataset(name, path):
     if movielens in name:
         return WrapperMultivaluedDataset(path)
-    elif name == criteo:
+    elif name in [criteo, 'wrapper']:
         return WrapperDataset(path)
-    elif name == avazu:
+    elif name in [avazu, triple_dataset, random_binary_function, random_binary_function_4_cols, compas]:
         return WrapperDataset(path, sep=',')
-    elif name == 'wrapper':
-        return WrapperDataset(path)
     else:
         raise ValueError('unknown dataset name: ' + name)
 
@@ -107,13 +106,15 @@ def get_iterator(dataset, batch_size, num_workers, device, shuffle):
 
 
 def get_iterators(train_dataset, valid_dataset, test_dataset, batch_size, num_workers, device):
-    train_data_loader = get_iterator(train_dataset, batch_size, num_workers, device, shuffle=True)   #DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, generator=get_seeded_generator())
-    valid_data_loader = get_iterator(valid_dataset, batch_size, num_workers, device, shuffle=False)  #DataLoader(valid_dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=True, generator=get_seeded_generator())
-    test_data_loader = get_iterator(test_dataset, batch_size, num_workers, device, shuffle=False)   #DataLoader(test_dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=True, generator=get_seeded_generator())
-    return train_data_loader, valid_data_loader, test_data_loader
+    train_data_loader = get_iterator(train_dataset, batch_size, num_workers, device, shuffle=True)
+    valid_data_loader = get_iterator(valid_dataset, batch_size, num_workers, device, shuffle=False)
+    test_data_loader = get_iterator(test_dataset, batch_size, num_workers, device, shuffle=False)
+
+    train_data_loader_loss = get_iterator(train_dataset, batch_size, num_workers, device, shuffle=False)
+    return train_data_loader, valid_data_loader, test_data_loader, train_data_loader_loss
 
 
-def get_model(name, dataset, rank_param, emb_size):
+def get_model(name, dataset, rank_param, emb_size, tensor_fm_params=None):
     """
     Hyperparameters are empirically determined, not opitmized.
     """
@@ -122,7 +123,7 @@ def get_model(name, dataset, rank_param, emb_size):
     is_multival = dataset.multivalued
 
     if name == 'lr':
-        return LogisticRegressionModel(num_features)
+        return LogisticRegressionModel(num_features=num_features, is_multivalued=is_multival)
     elif name == 'fm':
         return FactorizationMachineModel(num_features, embed_dim=emb_size, is_multivalued=is_multival)
     elif name == 'hofm':
@@ -130,12 +131,22 @@ def get_model(name, dataset, rank_param, emb_size):
     elif name == 'ffm':
         return FieldAwareFactorizationMachineModel(num_features, embed_dim=4)
     elif name == 'fwfm':
-        return FieldWeightedFactorizationMachineModel(num_features=num_features, embed_dim=emb_size, num_fields=num_columns, is_multivalued=is_multival)
+        return FieldWeightedFactorizationMachineModel(num_features=num_features, embed_dim=emb_size,
+                                                      num_fields=num_columns, is_multivalued=is_multival)
     elif name == 'pruned_fwfm':
         topk = rank_param * (num_columns + 1)
-        return PrunedFieldWeightedFactorizationMachineModel(num_features=num_features, embed_dim=emb_size, num_fields=num_columns, topk=topk, is_multivalued=is_multival)
+        return PrunedFieldWeightedFactorizationMachineModel(num_features=num_features, embed_dim=emb_size,
+                                                            num_fields=num_columns, topk=topk,
+                                                            is_multivalued=is_multival)
     elif name == 'lowrank_fwfm':
-        return LowRankFieldWeightedFactorizationMachineModel(num_features=num_features, embed_dim=emb_size, num_fields=num_columns, c=rank_param, is_multivalued=is_multival)
+        return LowRankFieldWeightedFactorizationMachineModel(num_features=num_features, embed_dim=emb_size,
+                                                             num_fields=num_columns, c=rank_param,
+                                                             is_multivalued=is_multival)
+    # dim_int = [d_1,...,d_l] and rank_tensors = [r_1,...,r_l] are two lists
+    # For an index 1 <= i <= l, we consider a d_i-order interaction of rank r_i
+    elif name == 'tensorfm':
+        return TensorFactorizationMachineModel(num_features, num_columns, emb_size, dim_int=tensor_fm_params.dim_int,
+                                               rank_tensors=tensor_fm_params.ten_ranks, is_multivalued=is_multival)
     elif name == 'fnn':
         return FactorizationSupportedNeuralNetworkModel(num_features, embed_dim=16, mlp_dims=(16, 16), dropout=0.2)
     elif name == 'wd':
@@ -145,7 +156,7 @@ def get_model(name, dataset, rank_param, emb_size):
     elif name == 'opnn':
         return ProductNeuralNetworkModel(num_features, embed_dim=16, mlp_dims=(16,), method='outer', dropout=0.2)
     elif name == 'dcn':
-        return DeepCrossNetworkModel(num_features, embed_dim=16, num_layers=3, mlp_dims=(16, 16), dropout=0.2)
+        return DeepCrossNetworkModel(num_features, num_columns, embed_dim=emb_size, num_layers=2, mlp_dims=(16, 16), dropout=0.2, is_multival=is_multival)
     elif name == 'nfm':
         return NeuralFactorizationMachineModel(num_features, embed_dim=64, mlp_dims=(64,), dropouts=(0.2, 0.2))
     # elif name == 'ncf':
@@ -162,10 +173,11 @@ def get_model(name, dataset, rank_param, emb_size):
         return ExtremeDeepFactorizationMachineModel(
             num_features, embed_dim=16, cross_layer_sizes=(16, 16), split_half=False, mlp_dims=(16, 16), dropout=0.2)
     elif name == 'afm':
-        return AttentionalFactorizationMachineModel(num_features, embed_dim=16, attn_size=16, dropouts=(0.2, 0.2))
+        return AttentionalFactorizationMachineModel(num_features, embed_dim=emb_size, attn_size=8, dropouts=(0.2, 0.2), is_multival=is_multival)
     elif name == 'afi':
         return AutomaticFeatureInteractionModel(
-             num_features, embed_dim=16, atten_embed_dim=64, num_heads=2, num_layers=3, mlp_dims=(400, 400), dropouts=(0, 0, 0))
+            num_features, embed_dim=16, atten_embed_dim=64, num_heads=2, num_layers=3, mlp_dims=(400, 400),
+            dropouts=(0, 0, 0))
     elif name == 'afn':
         print("Model:AFN")
         return AdaptiveFactorizationNetwork(
@@ -177,7 +189,8 @@ def get_model(name, dataset, rank_param, emb_size):
 def get_baselines_log_loss(targets):
     log_loss = torch.nn.BCELoss()
     targets_ctr = torch.sum(targets) / targets.size(dim=0)
-    ctr_loss = log_loss(torch.ones_like(targets) * targets_ctr.item(), targets).item()  # global train ctr 0.22711533894173677
+    ctr_loss = log_loss(torch.ones_like(targets) * targets_ctr.item(),
+                        targets).item()  # global train ctr 0.22711533894173677
     half_loss = log_loss((torch.ones_like(targets) * 0.5).float(), targets).item()
 
     return ctr_loss, half_loss
@@ -211,8 +224,8 @@ class EarlyStopper(object):
 
 class LossCalc:
     total_loss = 0
-    total_ctr_loss = 0     # loss w.r.t. ctr prediction on data
-    total_half_loss = 0    # loss w.r.t. constant 1/2 prediction
+    total_ctr_loss = 0  # loss w.r.t. ctr prediction on data
+    total_half_loss = 0  # loss w.r.t. constant 1/2 prediction
 
     def __init__(self, total_loss, total_ctr_loss, total_half_loss):
         self.total_loss = total_loss
@@ -250,19 +263,39 @@ def get_from_queue(q):
         return
 
 
-def set_torch_seed():
-    torch.manual_seed(torch_global_seed)
-    # torch.cuda.manual_seed(torch_global_seed)
-    torch.cuda.manual_seed_all(torch_global_seed)
+class EpochStopper(object):
+    def __init__(self, num_batches_in_epoch, do_partial_epochs):
+        self.num_batches_in_epoch = num_batches_in_epoch
+        self.do_partial_epochs = do_partial_epochs
+        self.epoch_stop = False
+        self.counter = 0
 
-    random.seed(python_random_seed)
-    np.random.seed(python_random_seed)
+    def __call__(self):
+        self.counter += 1
+        if self.do_partial_epochs:
+            self.epoch_stop = (self.counter >= self.num_batches_in_epoch)
+
+    def restart(self):
+        self.epoch_stop = False
+        self.counter = 0
+
+
+def set_torch_seed(tmp_seed=0):
+    torch_seed = torch_global_seed + tmp_seed
+    python_seed = python_random_seed + tmp_seed
+
+    torch.manual_seed(torch_seed)
+    # torch.cuda.manual_seed(torch_seed)
+    torch.cuda.manual_seed_all(torch_seed)
+
+    random.seed(python_seed)
+    np.random.seed(python_seed)
 
     # When running on the CuDNN backend, two further options must be set
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     # Set a fixed value for the hash seed
-    os.environ["PYTHONHASHSEED"] = str(python_random_seed)
+    os.environ["PYTHONHASHSEED"] = str(python_seed)
 
 
 def get_seeded_generator():
