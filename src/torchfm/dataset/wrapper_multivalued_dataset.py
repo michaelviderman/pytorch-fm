@@ -16,8 +16,7 @@ class WrapperMultivaluedDataset(torch.utils.data.Dataset):
     """
     multivalued = True
 
-    # dataset_path = "/Users/viderman/Documents/workspace/factorization_machine_git/pytorch-fm/torchfm/test-datasets/movielens/ml-1m/train.csv"
-    def __init__(self, dataset_path, sep=',', secondary_sep='|', engine='c', header='infer', spark=None):
+    def __init__(self, dataset_path, sep=',', secondary_sep='|', engine='c', header='infer'):
         miltival_col_name = 'genres'
         data = read_pd_dataframe(dataset_path, sep, engine, header)
         self.targets = data['label'].to_numpy().astype(np.float32)
@@ -55,18 +54,5 @@ class WrapperMultivaluedDataset(torch.utils.data.Dataset):
         return weights.astype(np.float32)
 
     @staticmethod
-    def _create_offsets(lst, num_cols, global_offsets): return np.array(global_offsets + [num_cols + len(lst)])
-
-
-    # def __preprocess_target(self, target):
-    #     target[target <= 3] = 0
-    #     target[target > 3] = 1
-    #     return target
-
-#data[genres_lst'len_to_pad'] = int(max_length - data['length_genres'])
-#data['to_pad'] = data['genres'].map(lambda x: [0] * (max_length-len(x))
-
-#lst = [torch.tensor(item) for item in data['genres']]
-
-#ds = WrapperMultivaluedDataset("/Users/viderman/Documents/workspace/factorization_machine_git/pytorch-fm/torchfm/test-datasets/movielens/ml-1m/train.csv")
-
+    def _create_offsets(lst, num_cols, global_offsets):
+        return np.array(global_offsets + [num_cols + len(lst)])

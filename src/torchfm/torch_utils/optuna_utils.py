@@ -11,8 +11,11 @@ def create_journal_name(base_journal_name, suffix):
     return base_journal_name + suffix + '.log'
 
 
-def get_journal_name(model_name, metric_top_optimize, top_k_rank, emb_size):
-    return f"{optuna_journal_log}_{model_name}_{metric_top_optimize}_{top_k_rank}_{emb_size}.log"
+def get_journal_name(model_name, metric_top_optimize, top_k_rank, emb_size, dim_int, ten_ranks):
+    model_basic_params = f"{model_name}_{metric_top_optimize}_{top_k_rank}_{emb_size}"
+    dim_int_str = "_".join([str(i) for i in dim_int])
+    ten_ranks_str = "_".join([str(i) for i in ten_ranks])
+    return f"{optuna_journal_log}_{model_basic_params}_{dim_int_str}_{ten_ranks_str}.log"
 
 
 def erase_content_journal(journal_log):

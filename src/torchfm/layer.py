@@ -18,6 +18,7 @@ class FeaturesLinear(torch.nn.Module):
     def forward(self, x, return_l2=False):
         """
         :param x: Long tensor of size ``(batch_size, num_fields)``
+        :param return_l2: whether to return the l2 regularization term
         """
         embed, reg = self.fc(x, return_l2)
         score = torch.sum(embed, dim=1) + self.bias
@@ -169,15 +170,19 @@ class CrossNetwork(torch.nn.Module):
             torch.nn.Parameter(torch.zeros((input_dim,))) for _ in range(num_layers)
         ])
 
-    def forward(self, x):
+    def forward(self, x, return_l2=False):
         """
         :param x: Float tensor of size ``(batch_size, num_fields, embed_dim)``
+        :param return_l2: whether to return the l2 regularization term
         """
         x0 = x
+        reg_loss = 0.0
         for i in range(self.num_layers):
             xw = self.w[i](x)
             x = x0 * xw + self.b[i] + x
-        return x
+            if return_l2:
+                reg_loss += torch.norm(self.w[i].weight, p=2)**2
+        return x, reg_loss
 
 
 class AttentionalFactorizationMachine(torch.nn.Module):
@@ -189,9 +194,10 @@ class AttentionalFactorizationMachine(torch.nn.Module):
         self.fc = torch.nn.Linear(embed_dim, 1)
         self.dropouts = dropouts
 
-    def forward(self, x):
+    def forward(self, x, return_l2=False):
         """
         :param x: Float tensor of size ``(batch_size, num_fields, embed_dim)``
+        :param return_l2: whether to return the l2 regularization term
         """
         num_fields = x.shape[1]
         row, col = list(), list()
@@ -205,7 +211,13 @@ class AttentionalFactorizationMachine(torch.nn.Module):
         attn_scores = F.dropout(attn_scores, p=self.dropouts[0], training=self.training)
         attn_output = torch.sum(attn_scores * inner_product, dim=1)
         attn_output = F.dropout(attn_output, p=self.dropouts[1], training=self.training)
-        return self.fc(attn_output)
+
+        reg_loss = (
+            torch.norm(self.attention.weight, p=2) ** 2 +
+            torch.norm(self.projection.weight, p=2) ** 2 +
+            torch.norm(self.fc.weight, p=2) ** 2
+        ) if return_l2 else 0.0
+        return self.fc(attn_output), reg_loss
 
 
 class CompressedInteractionNetwork(torch.nn.Module):
