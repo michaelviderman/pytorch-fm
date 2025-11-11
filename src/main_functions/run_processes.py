@@ -24,6 +24,7 @@ fm_options = [(fm, met_to_opt, 0, emb_size, [0], [0]) for met_to_opt in metrics_
 lr_options = [(lr, met_to_opt, 0, emb_sizes[0], [0], [0]) for met_to_opt in metrics_to_optimize]
 dcn_options = [(dcn, met_to_opt, 0, emb_size, [0], [0]) for met_to_opt in metrics_to_optimize for emb_size in emb_sizes]
 afm_options = [(afm, met_to_opt, 0, emb_size, [0], [0]) for met_to_opt in metrics_to_optimize for emb_size in emb_sizes]
+hofm_options = [(hofm, met_to_opt, 0, emb_size, [0], [0]) for met_to_opt in metrics_to_optimize for emb_size in emb_sizes]
 
 # 8 processes
 # Use: 'tmux attach'   to run session to run the python from

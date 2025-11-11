@@ -19,6 +19,7 @@ fm = 'fm'
 lr = 'lr'
 dcn = 'dcn'
 afm = 'afm'
+hofm = 'hofm'
 lowrank_fwfm = "lowrank_fwfm"
 pruned_fwfm = "pruned_fwfm"
 tensorfm = "tensorfm"
@@ -36,6 +37,7 @@ movielens = "movielens"
 triple_dataset = "triple-dataset"
 random_binary_function = "random_binary_function"
 random_binary_function_4_cols = "random_binary_function_4_cols"
+random_binary_function_4_100_cols = "random_binary_function_4_100_cols"
 compas = "compas"
 synthetic_interactions_trees = "synthetic_interactions_trees"
 

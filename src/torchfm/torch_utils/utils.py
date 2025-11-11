@@ -125,7 +125,7 @@ def get_model(name, dataset, rank_param, emb_size, tensor_fm_params=None):
     elif name == 'fm':
         return FactorizationMachineModel(num_features, embed_dim=emb_size, is_multivalued=is_multival)
     elif name == 'hofm':
-        return HighOrderFactorizationMachineModel(num_features, order=3, embed_dim=16)
+        return HighOrderFactorizationMachineModel(num_features, embed_dim=emb_size, order=3, is_multivalued=is_multival)
     elif name == 'ffm':
         return FieldAwareFactorizationMachineModel(num_features, embed_dim=4)
     elif name == 'fwfm':
